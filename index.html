@@ -1,0 +1,739 @@
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head><body>
+<title>Storage Explorer</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&family=Space+Grotesk:wght@500;600;700&display=swap">
+<style>
+/* Layout: sticky tab bar over one reading column; each tab is a self-contained lesson, ordered foundation -> flow -> choice -> reference -> exam. */
+:root{
+  --bg:#f3f6f8; --surface:#ffffff; --fg:#13202b; --muted:#56687a; --line:#d8e0e7;
+  --accent:#0a7a74; --accent-soft:#ddf1ee; --accent-fg:#ffffff;
+  --ok:#15803d; --ok-soft:#dcf3e3; --warn:#a15a07; --warn-soft:#fbeed5; --bad:#b42318; --bad-soft:#fbe1de;
+  --code-bg:#0f1b24; --code-fg:#d6e4ee; --code-key:#7dd3c8; --code-com:#7f93a4;
+  --font-display:'Space Grotesk',system-ui,sans-serif; --font-body:'Inter',system-ui,sans-serif; --font-mono:'JetBrains Mono',ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0d151c; --surface:#142029; --fg:#e5edf3; --muted:#8da1b2; --line:#24343f;
+  --accent:#4cc9bf; --accent-soft:#12312e; --accent-fg:#06201e;
+  --ok:#5fd18a; --ok-soft:#12301e; --warn:#e8a94d; --warn-soft:#33260f; --bad:#f28b82; --bad-soft:#3a1816;
+  --code-bg:#091219; --code-fg:#d6e4ee; --code-key:#7dd3c8; --code-com:#6f8393; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0d151c; --surface:#142029; --fg:#e5edf3; --muted:#8da1b2; --line:#24343f;
+  --accent:#4cc9bf; --accent-soft:#12312e; --accent-fg:#06201e;
+  --ok:#5fd18a; --ok-soft:#12301e; --warn:#e8a94d; --warn-soft:#33260f; --bad:#f28b82; --bad-soft:#3a1816;
+  --code-bg:#091219; --code-fg:#d6e4ee; --code-key:#7dd3c8; --code-com:#6f8393; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font:15px/1.6 var(--font-body);padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 48px}
+.wrap{max-width:980px;margin:0 auto}
+h1,h2,h3{font-family:var(--font-display);text-wrap:balance;line-height:1.2;margin:0}
+h1{font-size:clamp(26px,5vw,38px);letter-spacing:-.02em}
+h2{font-size:22px;letter-spacing:-.01em}
+h3{font-size:16px}
+p{margin:0}
+code,pre,.mono{font-family:var(--font-mono)}
+code{font-size:.88em;background:var(--accent-soft);color:var(--fg);padding:1px 6px;border-radius:4px}
+.eyebrow{font:600 11px/1 var(--font-body);letter-spacing:.1em;text-transform:uppercase;color:var(--accent)}
+header.top{padding-block:28px 18px;display:grid;gap:10px}
+header.top p{color:var(--muted);max-width:62ch}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+nav.tabs{position:sticky;top:env(safe-area-inset-top,0px);z-index:9;background:var(--bg);border-bottom:1px solid var(--line);margin-inline:calc(-1*max(16px,env(safe-area-inset-left,0px)));padding-inline:max(16px,env(safe-area-inset-left,0px));overflow-x:auto;display:flex;gap:4px;scrollbar-width:thin}
+nav.tabs a{flex:none;padding:12px 14px;color:var(--muted);text-decoration:none;font-weight:500;border-bottom:2px solid transparent;white-space:nowrap}
+nav.tabs a:hover{color:var(--fg)}
+nav.tabs a[aria-current="true"]{color:var(--accent);border-bottom-color:var(--accent)}
+a:focus-visible,button:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+section.view{display:none;padding-top:26px;gap:28px}
+section.view.on{display:grid}
+.lead{font-size:17px;max-width:64ch}
+.muted{color:var(--muted)}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;min-width:0}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.grid3{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px}
+.stack{display:grid;gap:12px;min-width:0}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:10px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;min-width:560px;font-size:14px}
+th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font:600 11px/1.2 var(--font-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);background:var(--bg)}
+tr:last-child td{border-bottom:0}
+.chain{display:flex;flex-wrap:wrap;align-items:stretch;gap:8px}
+.node{flex:1 1 150px;min-width:0;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:12px}
+.node b{display:block;font-family:var(--font-display)}
+.node span{font-size:13px;color:var(--muted)}
+.arrow{align-self:center;color:var(--muted);font-family:var(--font-mono)}
+.node.who-dev{border-color:var(--accent)}
+.node.who-admin{border-style:dashed}
+.ladder{display:grid;gap:8px}
+.rung{display:grid;grid-template-columns:minmax(120px,190px) 1fr;gap:12px;align-items:center}
+.rung .bar{height:30px;border-radius:6px;display:flex;align-items:center;padding-inline:10px;font-size:13px;font-weight:500;background:var(--accent-soft);color:var(--fg);min-width:0}
+.rung .name{font-family:var(--font-mono);font-size:13px}
+.pill{display:inline-block;font:600 11px/1 var(--font-body);padding:4px 8px;border-radius:99px;letter-spacing:.03em}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
+.pill.bad{background:var(--bad-soft);color:var(--bad)}
+.pill.acc{background:var(--accent-soft);color:var(--accent)}
+.pill.mute{background:var(--bg);color:var(--muted);border:1px solid var(--line)}
+button{font:inherit;cursor:pointer}
+.btn{border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:8px 14px;border-radius:8px;font-weight:500}
+.btn:hover{border-color:var(--accent)}
+.btn.primary{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+.btn[disabled]{opacity:.45;cursor:default}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--line);background:var(--surface);color:var(--fg);padding:7px 12px;border-radius:99px;font-size:14px}
+.chip[aria-pressed="true"]{background:var(--accent);color:var(--accent-fg);border-color:var(--accent)}
+pre.code{margin:0;background:var(--code-bg);color:var(--code-fg);border-radius:8px;padding:14px 16px;overflow-x:auto;font-size:13px;line-height:1.55;tab-size:2}
+pre.code .c{color:var(--code-com)}
+pre.code .k{color:var(--code-key)}
+.codehead{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+input[type=search]{width:100%;font:inherit;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+details.item{background:var(--surface);border:1px solid var(--line);border-radius:10px}
+details.item>summary{cursor:pointer;padding:14px 16px;list-style:none;display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+details.item>summary::-webkit-details-marker{display:none}
+details.item>summary::before{content:"+";font-family:var(--font-mono);color:var(--accent);width:1ch}
+details.item[open]>summary::before{content:"\2212"}
+details.item .body{padding:0 16px 16px;display:grid;gap:12px}
+.kv{display:grid;grid-template-columns:110px 1fr;gap:6px 12px;font-size:14px}
+.kv dt{color:var(--muted);font-weight:500}
+.kv dd{margin:0;min-width:0}
+.callout{border-left:3px solid var(--accent);background:var(--accent-soft);padding:12px 14px;border-radius:0 8px 8px 0;font-size:14px}
+.callout.warn{border-color:var(--warn);background:var(--warn-soft)}
+.stage{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.obj{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--surface);min-height:92px;transition:opacity .2s,border-color .2s}
+.obj.off{opacity:.35;border-style:dashed}
+.obj h4{margin:0 0 6px;font:600 12px/1 var(--font-body);letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.obj .mono{font-size:12.5px;display:block;overflow-wrap:anywhere}
+.obj.hl{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-soft)}
+.theme{margin-left:auto;flex:none}
+.progressrow{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+@media (max-width:520px){.rung{grid-template-columns:1fr;gap:4px}.kv{grid-template-columns:1fr;gap:0}.kv dd{margin-bottom:8px}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+<header class="top">
+  <span class="eyebrow">CKA storage domain</span>
+  <h1>Storage Explorer</h1>
+  <p>A Pod's disk disappears with the Pod. Every storage object in Kubernetes answers three questions: where the data lives, who creates it, and how long it lasts. Start with Foundations, then work down the tabs.</p>
+</header>
+<nav class="tabs" id="tabs" aria-label="Sections">
+  <a href="#foundations">Foundations</a>
+  <a href="#lifecycle">Lifecycle</a>
+  <a href="#pick">Pick a volume</a>
+  <a href="#terms">Terms</a>
+  <a href="#yaml">YAML</a>
+  <a href="#debug">Debug</a>
+  <a href="#drills">Exam drills</a>
+</nav>
+
+<section class="view" id="v-foundations">
+  <div class="stack">
+    <h2>The one chain to remember</h2>
+    <p class="lead">A Pod never talks to a disk. It names a claim. The claim finds a volume. The volume points at real storage. A StorageClass lets Kubernetes create that volume on demand.</p>
+    <div class="chain" role="img" aria-label="Pod, then PVC, then PV, then real disk; StorageClass creates the PV on demand">
+      <div class="node who-dev"><b>Pod</b><span><code>volumes:</code> names a claim, <code>volumeMounts:</code> picks the path</span></div>
+      <span class="arrow">&rarr;</span>
+      <div class="node who-dev"><b>PVC</b><span>"I need 10Gi, ReadWriteOnce." A request, namespaced.</span></div>
+      <span class="arrow">&rarr;</span>
+      <div class="node who-admin"><b>PV</b><span>The real volume. Cluster-wide, no namespace.</span></div>
+      <span class="arrow">&rarr;</span>
+      <div class="node who-admin"><b>Disk</b><span>NFS share, cloud disk, local SSD, Nutanix volume</span></div>
+    </div>
+    <div class="callout"><b>StorageClass</b> sits beside the chain. When a PVC arrives and no PV matches, the class tells a CSI driver to create one. That is dynamic provisioning, and it is how most real clusters work. Solid outline = developer owns it. Dashed outline = admin or driver owns it.</div>
+  </div>
+
+  <div class="stack">
+    <h2>How long does the data live?</h2>
+    <p class="muted">Pick the shortest lifetime that does the job.</p>
+    <div class="ladder" id="ladder"></div>
+  </div>
+
+  <div class="stack">
+    <h2>If you know traditional storage</h2>
+    <div class="tablewrap"><table>
+      <thead><tr><th>Traditional / HCI</th><th>Kubernetes</th><th>Who</th></tr></thead>
+      <tbody id="maptbl"></tbody>
+    </table></div>
+  </div>
+
+  <div class="stack">
+    <h2>Three rules that settle most exam questions</h2>
+    <div class="grid3">
+      <div class="panel stack"><h3>PVs have no namespace</h3><p class="muted">PVCs, Pods and most volume sources do. A PVC can only be used by Pods in its own namespace.</p></div>
+      <div class="panel stack"><h3>Binding is one to one</h3><p class="muted">One PVC binds to exactly one PV, matched on size (at least), access mode, storageClassName and selectors. A bound PV is taken, even if it is bigger.</p></div>
+      <div class="panel stack"><h3>Make a PV file only for static storage</h3><p class="muted">If a default StorageClass with a provisioner exists, write only the PVC. Write a PV yourself when the task hands you a path, an NFS server, or says <code>hostPath</code>.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="view" id="v-lifecycle"><div class="stack" id="lifecycle-root"></div></section>
+<section class="view" id="v-pick"><div class="stack" id="pick-root"></div></section>
+<section class="view" id="v-terms"><div class="stack" id="terms-root"></div></section>
+<section class="view" id="v-yaml"><div class="stack" id="yaml-root"></div></section>
+<section class="view" id="v-debug"><div class="stack" id="debug-root"></div></section>
+<section class="view" id="v-drills"><div class="stack" id="drills-root"></div></section>
+</div>
+<script>
+(function(){
+const $=(s,r=document)=>r.querySelector(s);
+const el=(t,a={},h='')=>{const e=document.createElement(t);for(const k in a){if(k==='class')e.className=a[k];else e.setAttribute(k,a[k]);}if(h)e.innerHTML=h;return e;};
+const esc=s=>String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function hl(src){return src.split('\n').map(l=>{const i=l.indexOf('#');let code=l,com='';if(i>=0&&(i===0||/\s/.test(l[i-1]))){code=l.slice(0,i);com=l.slice(i);}
+  code=esc(code).replace(/^(\s*-?\s*)([A-Za-z0-9_.\/-]+)(:)(?=\s|$)/,'$1<span class="k">$2</span>$3');
+  return code+(com?'<span class="c">'+esc(com)+'</span>':'');}).join('\n');}
+function store(k,v){try{if(v===undefined)return JSON.parse(localStorage.getItem(k)||'null');localStorage.setItem(k,JSON.stringify(v));}catch(e){return null;}}
+async function copy(text,btn){const old=btn.textContent;try{await navigator.clipboard.writeText(text);btn.textContent='Copied';}catch(e){const r=document.createRange();const pre=btn.closest('.stack').querySelector('pre');r.selectNodeContents(pre);const s=getSelection();s.removeAllRanges();s.addRange(r);btn.textContent='Selected, press copy';}setTimeout(()=>btn.textContent=old,1600);}
+function codeBlock(title,src){const w=el('div',{class:'stack'});const h=el('div',{class:'codehead'},'<span class="mono muted">'+esc(title)+'</span>');const b=el('button',{class:'btn',type:'button'},'Copy');b.textContent='Copy';b.onclick=()=>copy(src,b);h.appendChild(b);w.appendChild(h);w.appendChild(el('pre',{class:'code'},hl(src)));return w;}
+window.SE={$,el,esc,hl,store,copy,codeBlock};
+
+/* ---------- Foundations ---------- */
+const LADDER=[
+ ['container filesystem','Dies when the container restarts',18,'Default writable layer. Never keep data here.'],
+ ['emptyDir','Dies when the Pod is deleted',45,'Scratch space shared by containers in one Pod. Survives container crashes.'],
+ ['hostPath, local ephemeral','Tied to one node',70,'Lives on the node. Pod moves, data stays behind.'],
+ ['PVC + PV','Outlives the Pod',100,'Reclaim policy decides what happens when the claim is deleted.']
+];
+const lad=$('#ladder');
+LADDER.forEach(r=>{lad.appendChild(el('div',{class:'rung'},'<span class="name">'+esc(r[0])+'</span><div class="bar" style="width:'+r[2]+'%"><span>'+esc(r[1])+'</span></div>'));
+  lad.appendChild(el('p',{class:'muted',style:'font-size:13px;margin:-4px 0 6px'},esc(r[3])));});
+
+const MAP=[
+ ['Storage container, tier or policy (for example a Nutanix storage container)','StorageClass','<span class="pill mute">Admin</span>'],
+ ['Volume or vdisk carved from the array','PersistentVolume','<span class="pill mute">Admin</span> or <span class="pill acc">CSI driver</span>'],
+ ['Request: "I need 10 GB, one writer"','PersistentVolumeClaim','<span class="pill acc">Developer</span>'],
+ ['Disk attached to the VM and mounted in the guest OS','<code>volumes</code> + <code>volumeMounts</code> in the Pod','<span class="pill acc">Developer</span>'],
+ ['Array vendor driver or plugin','CSI driver (node plugin + controller plugin)','<span class="pill mute">Admin, once</span>'],
+ ['Array snapshot','VolumeSnapshot, VolumeSnapshotClass','<span class="pill acc">Developer</span>'],
+ ['Clone a vdisk','New PVC with <code>dataSource</code> pointing at a PVC','<span class="pill acc">Developer</span>'],
+ ['Extend a vdisk','Edit PVC size, needs <code>allowVolumeExpansion: true</code>','<span class="pill acc">Developer</span>'],
+ ['QoS or IOPS profile change','VolumeAttributesClass','<span class="pill mute">Admin</span> defines, dev picks']
+];
+const mt=$('#maptbl');MAP.forEach(r=>mt.appendChild(el('tr',{},'<td>'+r[0]+'</td><td><b>'+r[1]+'</b></td><td>'+r[2]+'</td>')));
+
+/* ---------- Lifecycle ---------- */
+const FLOWS={
+dynamic:{label:'Dynamic (StorageClass)',steps:[
+ {t:'Admin creates a StorageClass',d:'Names the provisioner (a CSI driver), the reclaim policy and the binding mode. One class can be marked default.',h:'sc',
+  s:{sc:['fast (default)','ok'],pvc:null,pv:null,pod:null},cmd:'kubectl get sc'},
+ {t:'Developer creates a PVC',d:'Names no PV. With <code>WaitForFirstConsumer</code> the claim stays Pending until a Pod uses it. With <code>Immediate</code> a PV is made now.',h:'pvc',
+  s:{sc:['fast (default)','ok'],pvc:['data-pvc  Pending','warn'],pv:null,pod:null},cmd:'kubectl get pvc'},
+ {t:'Developer creates a Pod that uses the PVC',d:'The Pod references <code>persistentVolumeClaim.claimName</code>. The scheduler now picks a node, which tells the driver where to create the disk.',h:'pod',
+  s:{sc:['fast (default)','ok'],pvc:['data-pvc  Pending','warn'],pv:null,pod:['web  Pending','warn']},cmd:'kubectl describe pod web'},
+ {t:'The driver creates the PV',d:'The external-provisioner sidecar calls CSI <code>CreateVolume</code> on the array or cloud, then writes a PV object. Its name looks like <code>pvc-&lt;uid&gt;</code>.',h:'pv',
+  s:{sc:['fast (default)','ok'],pvc:['data-pvc  Pending','warn'],pv:['pvc-3f9a…  Available','warn'],pod:['web  Pending','warn']},cmd:'kubectl get pv'},
+ {t:'PV and PVC bind',d:'The PV gets a <code>claimRef</code> to the PVC. Both show Bound.',h:'pvc',
+  s:{sc:['fast (default)','ok'],pvc:['data-pvc  Bound','ok'],pv:['pvc-3f9a…  Bound','ok'],pod:['web  Pending','warn']},cmd:'kubectl get pvc,pv'},
+ {t:'Kubelet attaches and mounts',d:'CSI node plugin stages and publishes the volume into the Pod. The container starts with the path mounted.',h:'pod',
+  s:{sc:['fast (default)','ok'],pvc:['data-pvc  Bound','ok'],pv:['pvc-3f9a…  Bound','ok'],pod:['web  Running','ok']},cmd:'kubectl exec web -- df -h /data'},
+ {t:'Pod is deleted, data stays',d:'The claim is independent of the Pod. A new Pod that names the same claim sees the same data (same node or a node that can reach the disk).',h:'pvc',
+  s:{sc:['fast (default)','ok'],pvc:['data-pvc  Bound','ok'],pv:['pvc-3f9a…  Bound','ok'],pod:['web  deleted','mute']},cmd:'kubectl delete pod web'},
+ {t:'PVC is deleted, policy decides',d:'<code>reclaimPolicy: Delete</code> removes the PV and the backing disk. <code>Retain</code> leaves the PV as Released with the data intact.',h:'pv',
+  s:{sc:['fast (default)','ok'],pvc:['data-pvc  deleted','mute'],pv:['pvc-3f9a…  deleted (Delete) or Released (Retain)','bad'],pod:null},cmd:'kubectl delete pvc data-pvc'}
+]},
+static:{label:'Static (you write the PV)',steps:[
+ {t:'Admin creates a PV by hand',d:'You state capacity, access modes, <code>storageClassName</code> and the real backend (NFS, hostPath, local). Nothing is created on the array. You point at something that already exists.',h:'pv',
+  s:{sc:null,pvc:null,pv:['pv-nfs-01  10Gi RWX  Available','ok'],pod:null},cmd:'kubectl apply -f pv.yaml'},
+ {t:'Developer creates a PVC',d:'The claim asks for 5Gi RWX with the same <code>storageClassName</code> (<code>manual</code>, an invented label). The controller looks for a PV that is large enough, has the mode, and has the same class.',h:'pvc',
+  s:{sc:null,pvc:['nfs-pvc  5Gi RWX  Pending','warn'],pv:['pv-nfs-01  10Gi RWX  Available','ok'],pod:null},cmd:'kubectl apply -f pvc.yaml'},
+ {t:'Binding happens',d:'The claim binds to the whole 10Gi PV. The extra 5Gi is not shared with anyone. If the PV is smaller than the request, the PVC stays Pending.',h:'pvc',
+  s:{sc:null,pvc:['nfs-pvc  Bound  (10Gi)','ok'],pv:['pv-nfs-01  Bound','ok'],pod:null},cmd:'kubectl get pv,pvc'},
+ {t:'Pod mounts the claim',d:'Same Pod spec as the dynamic case. The Pod does not know or care how the volume came to exist.',h:'pod',
+  s:{sc:null,pvc:['nfs-pvc  Bound  (10Gi)','ok'],pv:['pv-nfs-01  Bound','ok'],pod:['web  Running','ok']},cmd:'kubectl apply -f pod.yaml'},
+ {t:'PVC is deleted',d:'Static PVs default to <code>Retain</code>. The PV becomes Released and keeps its old <code>claimRef</code>, so no new claim can bind it, even though the data is still there.',h:'pv',
+  s:{sc:null,pvc:['nfs-pvc  deleted','mute'],pv:['pv-nfs-01  Released','warn'],pod:null},cmd:'kubectl delete pvc nfs-pvc'},
+ {t:'Admin makes it reusable',d:'Clear the stale claim reference, or delete and recreate the PV. Wipe the data first if the next tenant must not see it.',h:'pv',
+  s:{sc:null,pvc:null,pv:['pv-nfs-01  Available','ok'],pod:null},cmd:`kubectl patch pv pv-nfs-01 -p '{"spec":{"claimRef":null}}'`}
+]}};
+const lr=$('#lifecycle-root');
+lr.appendChild(el('h2',{},'What happens, in order'));
+lr.appendChild(el('p',{class:'lead'},'Step through both ways a PV can come into existence. Watch which object changes at each step, and who caused it.'));
+const modeRow=el('div',{class:'chips',role:'group','aria-label':'Provisioning mode'});
+const stageBox=el('div',{class:'stage'});const stepTitle=el('h3');const stepDesc=el('p',{class:'lead',style:'font-size:15px'});const stepCmd=el('div');const prog=el('div',{class:'progressrow'});
+const prev=el('button',{class:'btn',type:'button'},'Back');const next=el('button',{class:'btn primary',type:'button'},'Next');const counter=el('span',{class:'muted mono'});
+prog.append(prev,next,counter);
+let mode='dynamic',idx=0;
+const OBJ=[['sc','StorageClass'],['pvc','PVC'],['pv','PV'],['pod','Pod']];
+function draw(){const f=FLOWS[mode],st=f.steps[idx];
+ stageBox.innerHTML='';
+ OBJ.forEach(([k,n])=>{const v=st.s[k];const o=el('div',{class:'obj'+(v?'':' off')+(st.h===k?' hl':'')});
+  o.innerHTML='<h4>'+n+(k==='pv'?' · cluster':k==='sc'?' · cluster':' · namespace')+'</h4>'+(v?'<span class="mono">'+esc(v[0])+'</span><div style="margin-top:8px"><span class="pill '+v[1]+'">'+({ok:'healthy',warn:'waiting',bad:'ending',mute:'gone',acc:''}[v[1]])+'</span></div>':'<span class="muted" style="font-size:13px">not created</span>');
+  stageBox.appendChild(o);});
+ stepTitle.textContent=(idx+1)+'. '+st.t;stepDesc.innerHTML=st.d;
+ stepCmd.innerHTML='';stepCmd.appendChild(codeBlock('command',st.cmd));
+ counter.textContent=(idx+1)+' / '+f.steps.length;prev.disabled=idx===0;next.disabled=idx===f.steps.length-1;
+ [...modeRow.children].forEach(c=>c.setAttribute('aria-pressed',String(c.dataset.m===mode)));}
+Object.keys(FLOWS).forEach(m=>{const b=el('button',{class:'chip',type:'button','data-m':m,'aria-pressed':'false'},FLOWS[m].label);b.onclick=()=>{mode=m;idx=0;draw();};modeRow.appendChild(b);});
+prev.onclick=()=>{if(idx>0){idx--;draw();}};next.onclick=()=>{if(idx<FLOWS[mode].steps.length-1){idx++;draw();}};
+const live=el('div',{class:'panel stack','aria-live':'polite'});live.append(stepTitle,stepDesc,stepCmd);
+lr.append(modeRow,stageBox,live,prog);
+
+const refs=el('div',{class:'grid2'});
+refs.innerHTML=`
+<div class="panel stack"><h3>Access modes</h3><div class="stack" style="font-size:14px">
+<div><code>ReadWriteOnce</code> (RWO): one <b>node</b> reads and writes. Several Pods on that node may share it.</div>
+<div><code>ReadOnlyMany</code> (ROX): many nodes, read only.</div>
+<div><code>ReadWriteMany</code> (RWX): many nodes, read and write. Needs NFS, CephFS or similar, not a plain block disk.</div>
+<div><code>ReadWriteOncePod</code> (RWOP): exactly one <b>Pod</b> in the cluster.</div></div></div>
+<div class="panel stack"><h3>Reclaim policy</h3><div class="stack" style="font-size:14px">
+<div><code>Delete</code>: PV and backing disk go with the claim. Default for dynamic volumes.</div>
+<div><code>Retain</code>: PV becomes Released, data kept. Default for hand-made PVs. Change with <code>kubectl patch pv NAME -p '{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}'</code>.</div>
+<div><code>Recycle</code>: deprecated. Ignore it.</div></div></div>
+<div class="panel stack"><h3>Binding mode</h3><div class="stack" style="font-size:14px">
+<div><code>Immediate</code> (default): volume is created when the PVC is created, before any Pod exists.</div>
+<div><code>WaitForFirstConsumer</code>: waits for a Pod, so the volume lands in the same zone or node as the Pod. A Pending PVC with this mode is normal until a Pod appears.</div></div></div>
+<div class="panel stack"><h3>PV phases</h3><div class="chips"><span class="pill ok">Available</span><span class="pill acc">Bound</span><span class="pill warn">Released</span><span class="pill bad">Failed</span></div>
+<p class="muted" style="font-size:14px">Released means the claim is gone but the old <code>claimRef</code> still blocks reuse. Failed means automatic reclamation did not work.</p></div>`;
+lr.appendChild(refs);
+draw();
+})();
+</script>
+<script>
+(function(){
+const {$,el,esc}=SE;
+/* ---------- Pick a volume ---------- */
+const PICK=[
+ ['Scratch space shared by containers in one Pod','emptyDir','Created empty when the Pod starts, deleted with the Pod. Survives a container crash. Set <code>medium: Memory</code> for tmpfs, and <code>sizeLimit</code> to cap it.','Not persistent. If the question says "survive Pod deletion", this is the wrong answer.'],
+ ['Data must survive Pod restarts and rescheduling','PVC (plus a default StorageClass)','Write only a PVC and mount it. The default class creates the PV for you.','Check <code>kubectl get sc</code> first. If nothing is marked (default), name a class or write a PV.'],
+ ['The task gives me a node path or an NFS server','Static PV + PVC','Write the PV with the given path or server, then a PVC with the same <code>storageClassName</code>, size no larger than the PV, and compatible access mode.','Use the same <code>storageClassName</code> in both. A PVC with <code>storageClassName: ""</code> binds only to PVs with no class.'],
+ ['Each replica needs its own disk','StatefulSet <code>volumeClaimTemplates</code>','One PVC per Pod, named <code>&lt;template&gt;-&lt;pod&gt;</code>, for example <code>data-db-0</code>. Claims are kept when the StatefulSet scales down.','A Deployment with one PVC shares that one claim across all replicas, and RWO limits it to one node.'],
+ ['Config files inside a Pod','configMap volume','Each key becomes a file. Updates propagate to the mounted files after a short delay, unless you used <code>subPath</code>.','Environment variables from a ConfigMap do not update live. Volumes do.'],
+ ['Credentials inside a Pod','secret volume','Same idea as configMap, stored in tmpfs on the node. Set <code>defaultMode</code> to tighten permissions.','Base64 is encoding, not encryption.'],
+ ['Merge config, secret, token and Pod metadata into one folder','projected volume','One mount, many <code>sources</code>: configMap, secret, downwardAPI, serviceAccountToken.','Every source lands in the same directory, so file names must not clash.'],
+ ['Pod needs its own name, labels or limits as files','downwardAPI volume','Exposes Pod fields and container resource fields as files. Environment variables can do the same for most fields.','Env vars are fixed at container start. Files update while the Pod runs.'],
+ ['Throwaway disk from a CSI driver, lifetime of the Pod','Generic ephemeral volume','<code>ephemeral.volumeClaimTemplate</code> inside the Pod. A PVC named <code>&lt;pod&gt;-&lt;volume&gt;</code> is created and deleted with the Pod.','Gives you StorageClass features (size, performance) without a separate PVC file.'],
+ ['Read node files such as logs or the container socket','hostPath','Mounts a path from the node. Set <code>type</code> to <code>Directory</code>, <code>DirectoryOrCreate</code>, <code>File</code> and so on.','Security risk and node specific. Fine for exam tasks and for a single-node minikube.'],
+ ['Fast local SSD pinned to one node','local PV + nodeAffinity','A PV with a <code>local.path</code> and required <code>nodeAffinity</code>. Pair it with a class that has <code>provisioner: kubernetes.io/no-provisioner</code> and <code>WaitForFirstConsumer</code>.','Pods follow the data to that node. If the node dies, the data is unavailable.'],
+ ['Copy an existing volume','PVC with <code>dataSource</code> = PVC','New claim names the source claim. Same namespace, same class, CSI driver that supports cloning, size not smaller than the source.','Cloning is not snapshotting. It copies the live volume.'],
+ ['Back up and restore','VolumeSnapshot','Create a VolumeSnapshot from a PVC. Restore by creating a PVC whose <code>dataSource</code> is that snapshot.','Needs the snapshot CRDs, the snapshot controller and a driver that supports it. Not built in.'],
+ ['Make a disk bigger','Edit the PVC size','Raise <code>spec.resources.requests.storage</code>. The class must have <code>allowVolumeExpansion: true</code>.','You can grow but never shrink. Some drivers need the Pod restarted to grow the filesystem.'],
+ ['Fill a new volume from an external source','Volume populator','PVC uses <code>dataSourceRef</code> to point at a custom resource that a populator controller understands.','Advanced. Know the name and the field, not the details.'],
+ ['Cap temporary and log space per container','ephemeral-storage requests and limits','Under <code>resources</code>. Counts the writable layer, logs and non-memory emptyDir.','Exceeding the limit gets the Pod evicted.'],
+ ['Change IOPS or throughput of an existing volume','VolumeAttributesClass','PVC sets <code>volumeAttributesClassName</code>. Driver changes the volume without recreating it.','Newer feature. Needs driver support.']
+];
+const pr=$('#pick-root');
+pr.appendChild(el('h2',{},'What do you need?'));
+pr.appendChild(el('p',{class:'lead'},'Pick the need that sounds like your question. The answer shows the object to use and the trap an exam writer is likely to set.'));
+const chips=el('div',{class:'chips',role:'group','aria-label':'Needs'});
+const out=el('div',{class:'panel stack','aria-live':'polite'});
+let cur=0;
+function show(i){cur=i;[...chips.children].forEach((c,j)=>c.setAttribute('aria-pressed',String(j===i)));
+ const p=PICK[i];
+ out.innerHTML='<span class="eyebrow">Use</span><h2>'+p[1]+'</h2><dl class="kv"><dt>Why</dt><dd>'+p[2]+'</dd><dt>Watch for</dt><dd>'+p[3]+'</dd></dl>'+
+ '<p class="muted" style="font-size:13px">See the YAML tab for a copy-ready example where one exists.</p>';}
+PICK.forEach((p,i)=>{const b=el('button',{class:'chip',type:'button','aria-pressed':'false'},esc(p[0]));b.onclick=()=>show(i);chips.appendChild(b);});
+pr.append(chips,out);show(0);
+
+/* ---------- Terms ---------- */
+const TERMS=[
+ ['Volume','Core','A directory mounted into a container, declared once under <code>spec.volumes</code> and referenced under <code>volumeMounts</code>.','A disk attached to a VM, but described inside the Pod.','Two lists, two places. Names must match.'],
+ ['emptyDir','Ephemeral','Empty directory made when the Pod lands on a node. Removed when the Pod goes.','Scratch pad.','Common in sidecar tasks. Shared by all containers that mount it.'],
+ ['hostPath','Ephemeral','A path on the node mounted into the Pod.','Reaching through the glass into the host.','Fine for tasks. Pod rescheduled to another node sees different data.'],
+ ['configMap and secret volumes','Ephemeral','Keys become files. Both are backed by API objects, not disks.','Config drop folder.','Use <code>items</code> to pick keys, <code>subPath</code> to mount one file.'],
+ ['Projected volumes','Ephemeral','Several sources (configMap, secret, downwardAPI, serviceAccountToken) in one directory.','A single folder that is a mashup of several drop folders.','Look for <code>projected.sources</code> in the Pod spec.'],
+ ['Ephemeral volumes','Ephemeral','Volumes whose life is tied to the Pod. Includes emptyDir, configMap, secret, CSI inline and generic ephemeral volumes.','Pod-lifetime storage.','Generic form uses <code>ephemeral.volumeClaimTemplate</code>.'],
+ ['PersistentVolume (PV)','Persistent','Cluster-wide object describing one piece of storage. Has capacity, access modes, reclaim policy, class and a backend.','The disk itself.','No namespace. Status shows Available, Bound, Released, Failed.'],
+ ['PersistentVolumeClaim (PVC)','Persistent','Namespaced request for storage. Binds to one PV.','The order form.','Pending usually means no matching PV, wrong class, or WaitForFirstConsumer.'],
+ ['StorageClass','Provisioning','Cluster-wide template: provisioner, parameters, reclaim policy, binding mode, expansion.','A service tier on a price list.','Default class has the annotation <code>storageclass.kubernetes.io/is-default-class: "true"</code>.'],
+ ['Dynamic volume provisioning','Provisioning','PVC names a class, the driver creates the disk and the PV automatically.','Self-service instead of a ticket to the storage team.','A PVC with <code>storageClassName: ""</code> turns dynamic provisioning off for that claim.'],
+ ['CSI (Container Storage Interface)','Provisioning','Standard API between Kubernetes and a storage system. Driver has a controller part (create, snapshot) and a node part (mount).','The vendor driver.','Look at <code>kubectl get csidrivers</code> and <code>kubectl get pods -n kube-system</code>.'],
+ ['Volume Attributes Classes','Day 2','A named set of mutable volume parameters such as IOPS. PVC picks one with <code>volumeAttributesClassName</code>.','A QoS profile you can change after creation.','Newer than StorageClass. Rarely tested, know the idea.'],
+ ['Volume expansion','Day 2','Edit the PVC to a bigger size. Needs <code>allowVolumeExpansion: true</code> on the class.','Extend a vdisk.','Grow only. Check <code>kubectl describe pvc</code> for resize conditions.'],
+ ['Volume snapshots','Day 2','Point-in-time copy of a PVC, as a VolumeSnapshot object backed by a VolumeSnapshotContent.','Array snapshot.','Needs snapshot CRDs and a snapshot controller.'],
+ ['Volume snapshot classes','Day 2','Names the driver and the deletion policy for snapshots.','StorageClass for snapshots.','<code>deletionPolicy</code> is Delete or Retain.'],
+ ['CSI volume cloning','Day 2','New PVC whose <code>dataSource</code> is an existing PVC.','Clone a vdisk.','Same namespace and same class. Dynamic provisioning only.'],
+ ['Volume populators and data sources','Day 2','<code>dataSource</code> accepts a PVC or a VolumeSnapshot. <code>dataSourceRef</code> accepts custom resources handled by a populator.','Pre-loaded disk.','Know the two field names.'],
+ ['Storage capacity tracking','Scheduling','Drivers publish free space per topology as CSIStorageCapacity objects. The scheduler uses it to avoid nodes that cannot fit the volume.','Checking the shelf before sending the delivery.','Only when the CSIDriver sets <code>storageCapacity: true</code>.'],
+ ['Node-specific volume limits','Scheduling','A node can attach only so many volumes. The driver reports the number in CSINode, and the scheduler respects it.','Number of SCSI slots on a VM.','A Pod stuck Pending with "exceed max volume count" is this.'],
+ ['Local ephemeral storage','Scheduling','Node disk used for writable layers, logs and emptyDir. Requested and limited with <code>ephemeral-storage</code>.','Node scratch quota.','Over the limit means eviction.'],
+ ['Volume health monitoring','Operations','Driver reports volume problems as events on PVCs and Pods.','SMART alerts.','Alpha feature. Read it once, skip it for the exam.'],
+ ['Windows storage','Operations','Windows nodes support fewer volume types and use Windows paths.','Same ideas, smaller menu.','Not part of the CKA.']
+];
+const tr=$('#terms-root');
+tr.appendChild(el('h2',{},'Every term, one card'));
+tr.appendChild(el('p',{class:'lead'},'Search or scan. Each card gives what it is, an everyday comparison, and what the exam is likely to test.'));
+const s=el('input',{type:'search',id:'term-search',placeholder:'Search terms, for example snapshot, RWX, Pending','aria-label':'Search terms'});
+const tl=el('div',{class:'stack'});
+const groupPill={Core:'acc',Ephemeral:'mute',Persistent:'ok',Provisioning:'acc','Day 2':'warn',Scheduling:'mute',Operations:'mute'};
+function renderTerms(q){tl.innerHTML='';const n=q.trim().toLowerCase();let c=0;
+ TERMS.forEach(t=>{const hay=(t.join(' ')).toLowerCase();if(n&&!hay.includes(n))return;c++;
+  const d=el('details',{class:'item'});if(n)d.open=true;
+  d.innerHTML='<summary><b>'+t[0]+'</b><span class="pill '+groupPill[t[1]]+'">'+t[1]+'</span></summary><div class="body"><dl class="kv"><dt>What</dt><dd>'+t[2]+'</dd><dt>Think of it as</dt><dd>'+t[3]+'</dd><dt>Exam note</dt><dd>'+t[4]+'</dd></dl></div>';
+  tl.appendChild(d);});
+ if(!c)tl.appendChild(el('p',{class:'muted'},'Nothing matches. Try a shorter word.'));}
+s.addEventListener('input',()=>renderTerms(s.value));
+tr.append(s,tl);renderTerms('');
+})();
+</script>
+<script>
+(function(){
+const {$,el,esc,store,codeBlock}=SE;
+/* ---------- YAML ---------- */
+const Y=[
+['StorageClass','Dynamic provisioning. The provisioner string must match an installed CSI driver.',`apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: fast
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"   # makes it the default
+provisioner: csi.example.com        # see: kubectl get csidrivers
+reclaimPolicy: Delete               # Delete (default) or Retain
+volumeBindingMode: WaitForFirstConsumer
+allowVolumeExpansion: true
+parameters:
+  type: ssd                         # driver specific`],
+['PV (hostPath)','Static PV for single-node practice. No namespace.',`apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-host
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual          # a label, must match the PVC
+  hostPath:
+    path: /mnt/data
+    type: DirectoryOrCreate`],
+['PVC','Request that binds to the PV above. Size at most the PV size.',`apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-host
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: manual          # omit to use the default class, "" for no class
+  resources:
+    requests:
+      storage: 500Mi`],
+['Pod + PVC','The only part a Pod needs to know: the claim name.',`apiVersion: v1
+kind: Pod
+metadata:
+  name: web
+spec:
+  containers:
+    - name: nginx
+      image: nginx
+      volumeMounts:
+        - name: data                # must match volumes[].name
+          mountPath: /usr/share/nginx/html
+  volumes:
+    - name: data
+      persistentVolumeClaim:
+        claimName: pvc-host         # PVC in the same namespace`],
+['emptyDir','Two containers sharing scratch space.',`apiVersion: v1
+kind: Pod
+metadata:
+  name: shared
+spec:
+  containers:
+    - name: writer
+      image: busybox
+      command: ["sh","-c","while true; do date >> /shared/log; sleep 5; done"]
+      volumeMounts:
+        - name: scratch
+          mountPath: /shared
+    - name: reader
+      image: busybox
+      command: ["sh","-c","tail -F /shared/log"]
+      volumeMounts:
+        - name: scratch
+          mountPath: /shared
+  volumes:
+    - name: scratch
+      emptyDir:
+        sizeLimit: 100Mi            # add "medium: Memory" for tmpfs`],
+['NFS PV','Static, shareable between nodes. ReadWriteMany is possible.',`apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-nfs
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteMany
+  storageClassName: nfs
+  persistentVolumeReclaimPolicy: Retain
+  nfs:
+    server: 10.0.0.10
+    path: /exports/data`],
+['Local PV','Pinned to one node by nodeAffinity. Pair with a no-provisioner class.',`apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: local-storage
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-local
+spec:
+  capacity:
+    storage: 20Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-storage
+  local:
+    path: /mnt/disks/ssd1
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values: ["worker-1"]`],
+['StatefulSet','One PVC per replica, created from the template.',`apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: db
+spec:
+  serviceName: db
+  replicas: 2
+  selector:
+    matchLabels:
+      app: db
+  template:
+    metadata:
+      labels:
+        app: db
+    spec:
+      containers:
+        - name: redis
+          image: redis:7
+          volumeMounts:
+            - name: data
+              mountPath: /data
+  volumeClaimTemplates:             # creates data-db-0, data-db-1
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi`],
+['Generic ephemeral','Pod-lifetime PVC created from a template, inside the Pod.',`# Inside spec of a Pod
+volumes:
+  - name: scratch
+    ephemeral:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          storageClassName: fast
+          resources:
+            requests:
+              storage: 1Gi`],
+['Projected','Config, secret and Pod labels in one directory.',`# Inside spec of a Pod
+volumes:
+  - name: all-in-one
+    projected:
+      sources:
+        - configMap:
+            name: app-config
+        - secret:
+            name: app-secret
+        - downwardAPI:
+            items:
+              - path: labels
+                fieldRef:
+                  fieldPath: metadata.labels`],
+['Snapshot + restore','Needs snapshot CRDs, controller and a supporting driver.',`apiVersion: snapshot.storage.k8s.io/v1
+kind: VolumeSnapshot
+metadata:
+  name: data-snap
+spec:
+  volumeSnapshotClassName: csi-snapclass
+  source:
+    persistentVolumeClaimName: data-pvc
+---
+# Restore: a new PVC whose dataSource is the snapshot
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: data-restored
+spec:
+  storageClassName: fast
+  dataSource:
+    name: data-snap
+    kind: VolumeSnapshot
+    apiGroup: snapshot.storage.k8s.io
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 10Gi                 # at least the snapshot size`],
+['Clone','New PVC from an existing PVC. Same namespace and class.',`apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: data-clone
+spec:
+  storageClassName: fast
+  dataSource:
+    name: data-pvc
+    kind: PersistentVolumeClaim
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 10Gi                 # not smaller than the source`],
+['Ephemeral limits','Cap node-local scratch use per container.',`# Inside a container
+resources:
+  requests:
+    ephemeral-storage: 1Gi
+  limits:
+    ephemeral-storage: 2Gi`],
+['Commands','The ones you will type most.',`kubectl get sc,pv,pvc -A
+kubectl describe pvc NAME            # read Events at the bottom
+kubectl describe pv NAME
+kubectl get pv NAME -o yaml          # check claimRef and nodeAffinity
+kubectl explain pv.spec.hostPath     # field help, works in the exam
+kubectl patch sc NAME -p '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}'
+kubectl patch pv NAME -p '{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}'
+kubectl patch pv NAME -p '{"spec":{"claimRef":null}}'
+kubectl patch pvc NAME -p '{"spec":{"resources":{"requests":{"storage":"20Gi"}}}}'
+kubectl get csidrivers,csinodes
+kubectl run web --image=nginx --dry-run=client -o yaml > pod.yaml`]
+];
+const yr=$('#yaml-root');
+yr.appendChild(el('h2',{},'Copy-ready YAML'));
+yr.appendChild(el('p',{class:'lead'},'There is no imperative command to create a PV or PVC, so in the exam you copy a manifest from kubernetes.io and edit it. Know these shapes well enough to spot what to change.'));
+const chips=el('div',{class:'chips',role:'group','aria-label':'Manifests'});const box=el('div',{class:'stack','aria-live':'polite'});
+function showY(i){[...chips.children].forEach((c,j)=>c.setAttribute('aria-pressed',String(j===i)));box.innerHTML='';box.appendChild(el('p',{class:'muted'},esc(Y[i][1])));box.appendChild(codeBlock(Y[i][0],Y[i][2]));}
+Y.forEach((y,i)=>{const b=el('button',{class:'chip',type:'button','aria-pressed':'false'},esc(y[0]));b.onclick=()=>showY(i);chips.appendChild(b);});
+yr.append(chips,box);showY(0);
+
+/* ---------- Debug ---------- */
+const D=[
+['PVC Pending, no match','bad','No PV fits. Class name differs, PV is smaller than the request, access mode is not offered, or the PV is already bound.','<code>kubectl describe pvc</code>, then compare class, size and modes with <code>kubectl get pv</code>. Recreate the PVC with matching values.'],
+['PVC Pending, "waiting for first consumer"','warn','WaitForFirstConsumer is working as designed.','Create the Pod that uses the claim. The PV appears after scheduling.'],
+['PVC Pending, "storageclass not found"','bad','Typo in <code>storageClassName</code>, or the class was never created.','<code>kubectl get sc</code>. Fix the name, or create the class.'],
+['PVC Pending with a valid class','bad','The CSI driver is not running, so nothing creates the volume.','<code>kubectl get csidrivers</code>, <code>kubectl get pods -n kube-system</code>, and the provisioner Pod logs.'],
+['Pod Pending, "persistentvolumeclaim not found"','bad','<code>claimName</code> is wrong, or the PVC lives in another namespace.','Compare <code>kubectl get pvc -n NS</code> with the Pod spec.'],
+['Pod ContainerCreating, unable to mount','bad','RWO volume still attached to another node, NFS server unreachable, or the hostPath type cannot be created.','<code>kubectl describe pod</code>, read Events. Check which node holds the volume.'],
+['Pod Pending, "volume node affinity conflict"','bad','The PV is pinned to a node (local or zonal) and the Pod cannot go there.','<code>kubectl get pv NAME -o yaml</code> and compare with <code>nodeSelector</code>, taints and zone.'],
+['Pod Pending, "exceed max volume count"','warn','Node reached its attach limit.','Spread Pods across nodes. Limit comes from the CSINode object.'],
+['New PVC Pending, old PV is Released','warn','The PV keeps the old <code>claimRef</code> and blocks reuse.','<code>kubectl patch pv NAME -p \'{"spec":{"claimRef":null}}\'</code>.'],
+['PVC stuck Terminating','warn','A Pod still uses it. The <code>pvc-protection</code> finalizer holds the claim.','Delete the Pod first. Do not strip the finalizer unless nothing uses the claim.'],
+['Cannot grow a PVC','bad','Class lacks <code>allowVolumeExpansion: true</code>, or the PV is not dynamically provisioned.','Patch the class, then edit the PVC again. Shrinking is never allowed.'],
+['Resize stuck, "waiting for user to restart a pod"','warn','Filesystem resize happens on the next mount.','Delete the Pod so its controller recreates it.'],
+['Pod evicted, ephemeral storage','bad','Logs, writable layer or emptyDir passed the limit.','Raise the limit or write to a PVC. <code>kubectl describe pod</code> shows the eviction message.']
+];
+const dr=$('#debug-root');
+dr.appendChild(el('h2',{},'Symptom to cause'));
+dr.appendChild(el('p',{class:'lead'},'Every storage fault leaves a message in <code>kubectl describe</code>. Read the Events section first, then match it here.'));
+const tw=el('div',{class:'tablewrap'});const tb=el('table');tb.innerHTML='<thead><tr><th>Symptom</th><th>Likely cause</th><th>Check and fix</th></tr></thead>';const tbody=el('tbody');
+D.forEach(r=>tbody.appendChild(el('tr',{},'<td><span class="pill '+r[1]+'" style="margin-bottom:6px">'+(r[1]==='warn'?'often normal':'fault')+'</span><br><b>'+r[0]+'</b></td><td>'+r[2]+'</td><td>'+r[3]+'</td>')));
+tb.appendChild(tbody);tw.appendChild(tb);dr.appendChild(tw);
+
+/* ---------- Drills ---------- */
+const T=[
+['Default class swap','Class <code>standard</code> is the default. Make <code>fast</code> the default and <code>standard</code> a normal class.',
+`kubectl patch sc standard -p '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"false"}}}'
+kubectl patch sc fast -p '{"metadata":{"annotations":{"storageclass.kubernetes.io/is-default-class":"true"}}}'
+kubectl get sc                       # fast shows (default)`],
+['Local StorageClass','Create a StorageClass <code>local-sc</code>, no provisioner, that waits for the first consumer. It must not be the default.',
+`apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: local-sc
+provisioner: kubernetes.io/no-provisioner
+volumeBindingMode: WaitForFirstConsumer`],
+['PV, PVC and Pod end to end','Create PV <code>pv-log</code> (1Gi, RWO, hostPath <code>/opt/logs</code>, class <code>manual</code>, Retain). In namespace <code>app</code> create PVC <code>pvc-log</code> asking 500Mi, and Pod <code>logger</code> (busybox, <code>sleep 3600</code>) mounting it at <code>/var/log/app</code>.',
+`apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-log
+spec:
+  capacity:
+    storage: 1Gi
+  accessModes: ["ReadWriteOnce"]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: manual
+  hostPath:
+    path: /opt/logs
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pvc-log
+  namespace: app
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: manual
+  resources:
+    requests:
+      storage: 500Mi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: logger
+  namespace: app
+spec:
+  containers:
+    - name: c
+      image: busybox
+      command: ["sleep","3600"]
+      volumeMounts:
+        - name: logs
+          mountPath: /var/log/app
+  volumes:
+    - name: logs
+      persistentVolumeClaim:
+        claimName: pvc-log`],
+['Shared scratch space','Pod <code>pair</code> has containers <code>writer</code> and <code>reader</code> (busybox). Both mount an emptyDir at <code>/shared</code>.',
+`# Use the "emptyDir" manifest on the YAML tab. Check:
+kubectl exec pair -c reader -- ls /shared`],
+['Pending claim','PVC <code>db-pvc</code> asks 5Gi, class <code>manual</code>, and stays Pending. The only PV in that class is 2Gi. Fix it.',
+`kubectl describe pvc db-pvc          # no PV large enough
+kubectl get pv                       # PV is 2Gi
+kubectl get pvc db-pvc -o yaml > pvc.yaml
+# change storage: 5Gi to 2Gi
+kubectl delete pvc db-pvc
+kubectl apply -f pvc.yaml            # Bound`],
+['Grow a volume','PVC <code>data-pvc</code> is 5Gi on class <code>fast</code>. Make it 10Gi.',
+`kubectl get sc fast -o yaml | grep allowVolumeExpansion
+# if missing:
+kubectl patch sc fast -p '{"allowVolumeExpansion":true}'
+kubectl patch pvc data-pvc -p '{"spec":{"resources":{"requests":{"storage":"10Gi"}}}}'
+kubectl get pvc data-pvc -w`],
+['Reuse a Released PV','PV <code>pv-old</code> is Released. A new PVC must be able to bind it.',
+`kubectl patch pv pv-old -p '{"spec":{"claimRef":null}}'
+kubectl get pv pv-old                # Available`],
+['Keep data after delete','PV <code>pv-data</code> has reclaim policy Delete. Change it so the data survives the claim being deleted.',
+`kubectl patch pv pv-data -p '{"spec":{"persistentVolumeReclaimPolicy":"Retain"}}'
+kubectl get pv pv-data -o jsonpath='{.spec.persistentVolumeReclaimPolicy}'`],
+['One disk per replica','StatefulSet <code>web</code>, 3 replicas, nginx. Each replica needs its own 1Gi volume at <code>/usr/share/nginx/html</code>.',
+`# Use the StatefulSet manifest on the YAML tab, set replicas: 3,
+# volumeClaimTemplates name: www, mountPath: /usr/share/nginx/html
+kubectl get pvc                      # www-web-0, www-web-1, www-web-2`],
+['Restore from snapshot','Snapshot <code>data-snap</code> exists. Create PVC <code>data-restored</code> (10Gi, class <code>fast</code>) from it.',
+`# Use the "Snapshot + restore" manifest, second document only.
+kubectl get pvc data-restored`]
+];
+const kd='se-drills-v1';
+let done=store(kd)||{};
+const rr=$('#drills-root');
+rr.appendChild(el('h2',{},'Exam-style drills'));
+rr.appendChild(el('p',{class:'lead'},'Try each one on your own cluster before opening the answer. Allow about six minutes per task. In the exam, search kubernetes.io for "persistent volume" and copy the example, then edit.'));
+rr.appendChild(el('div',{class:'callout'},'On minikube the default class is usually <code>standard</code> with provisioner <code>k8s.io/minikube-hostpath</code>, so a bare PVC binds by itself. For static PV practice, give your PV and PVC a different class name, such as <code>manual</code>.'));
+const meter=el('div',{class:'progressrow'});const bar=el('div',{style:'flex:1 1 200px;height:8px;background:var(--line);border-radius:99px;overflow:hidden'},'<div id="barfill" style="height:100%;width:0;background:var(--accent);transition:width .25s"></div>');const mtxt=el('span',{class:'muted mono'});
+meter.append(bar,mtxt);rr.appendChild(meter);
+function upd(){const n=Object.values(done).filter(Boolean).length;$('#barfill').style.width=(n/T.length*100)+'%';mtxt.textContent=n+' of '+T.length+' done';}
+const list=el('div',{class:'stack'});
+T.forEach((t,i)=>{const d=el('details',{class:'item'});
+ d.innerHTML='<summary><span class="pill mute">Task '+(i+1)+'</span><b>'+t[0]+'</b></summary>';
+ const b=el('div',{class:'body'});b.appendChild(el('p',{},t[1]));
+ b.appendChild(el('details',{class:'item'},'<summary><b>Show solution</b></summary>'));
+ const inner=b.lastChild;const ib=el('div',{class:'body'});ib.appendChild(codeBlock('solution',t[2]));inner.appendChild(ib);
+ const lab=el('label',{style:'display:flex;gap:8px;align-items:center;font-size:14px'});const cb=el('input',{type:'checkbox',id:'done-'+i});cb.checked=!!done[i];
+ cb.onchange=()=>{done[i]=cb.checked;store(kd,done);upd();};lab.append(cb,document.createTextNode('I did this without looking'));b.appendChild(lab);
+ d.appendChild(b);list.appendChild(d);});
+rr.appendChild(list);upd();
+
+/* ---------- Router ---------- */
+const views=['foundations','lifecycle','pick','terms','yaml','debug','drills'];
+function route(){const h=(location.hash||'').replace('#','');const v=views.includes(h)?h:'foundations';
+ views.forEach(x=>{$('#v-'+x).classList.toggle('on',x===v);});
+ document.querySelectorAll('#tabs a').forEach(a=>a.setAttribute('aria-current',String(a.getAttribute('href')==='#'+v)));
+ const cur=$('#tabs a[aria-current="true"]');if(cur&&cur.scrollIntoView)cur.scrollIntoView({block:'nearest',inline:'center'});}
+window.addEventListener('hashchange',()=>{route();window.scrollTo(0,0);});
+route();
+})();
+</script>
+</body></html>
